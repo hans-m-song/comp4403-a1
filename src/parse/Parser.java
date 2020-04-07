@@ -44,7 +44,8 @@ import java_cup.runtime.ComplexSymbolFactory.Location;
  * CompoundStatement -> KW_BEGIN StatementList KW_END
  * StatementList -> Statement { SEMICOLON Statement }
  * Statement -> WhileStatement | IfStatement | CallStatement | Assignment |
- *          ReadStatement | WriteStatement | CompoundStatement
+ *          ReadStatement | WriteStatement | CompoundStatement | SkipStatement
+ * SkipStatement -> KW_SKIP
  * Assignment -> LValue ASSIGN Condition
  * WhileStatement -> KW_WHILE Condition KW_DO Statement
  * IfStatement -> KW_IF Condition KW_THEN Statement KW_ELSE Statement
@@ -467,7 +468,8 @@ public class Parser {
     private final static TokenSet STATEMENT_START_SET =
             LVALUE_START_SET.union(Token.KW_WHILE, Token.KW_IF,
                     Token.KW_READ, Token.KW_WRITE,
-                    Token.KW_CALL, Token.KW_BEGIN);
+                    Token.KW_CALL, Token.KW_BEGIN,
+                    Token.KW_SKIP);
 
     /**
      * Rule: CompoundStatement -> BEGIN StatementList END
@@ -508,7 +510,7 @@ public class Parser {
     /**
      * Rule: Statement -> Assignment | WhileStatement | IfStatement
      * | ReadStatement | WriteStatement | CallStatement
-     * | CompoundStatement
+     * | CompoundStatement | SkipStatement
      */
     private StatementNode parseStatement(TokenSet recoverSet) {
         return stmt.parse("Statement", STATEMENT_START_SET, recoverSet,
@@ -519,6 +521,8 @@ public class Parser {
                      * of using a switch statement can be used because the
                      * start set of every alternative contains just one token. */
                     switch (tokens.getKind()) {
+                        case KW_SKIP:
+                            return parseSkipStatement(recoverSet);
                         case IDENTIFIER:
                             return parseAssignment(recoverSet);
                         case KW_WHILE:
@@ -538,6 +542,15 @@ public class Parser {
                             // To keep the Java compiler happy - can't reach here
                             return new StatementNode.ErrorNode(tokens.getLocation());
                     }
+                });
+    }
+
+    private StatementNode parseSkipStatement(TokenSet recoverSet) {
+        return stmt.parse("Skip", Token.KW_SKIP, recoverSet,
+                () -> {
+                    Location loc = tokens.getLocation();
+                    tokens.match(Token.KW_SKIP);
+                    return new StatementNode.SkipNode(loc);
                 });
     }
 

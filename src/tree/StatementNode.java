@@ -391,5 +391,21 @@ public abstract class StatementNode {
                     newLine(level + 1) + loopStmt.toString(level + 1);
         }
     }
+
+    public static class SkipNode extends StatementNode {
+        public SkipNode(Location loc) {
+            super(loc);
+        }
+
+        @Override
+        public void accept(StatementVisitor visitor) {
+            visitor.visitSkipNode(this);
+        }
+
+        @Override
+        public String toString(int level) {
+            return "SKIP";
+        }
+    }
 }
 
