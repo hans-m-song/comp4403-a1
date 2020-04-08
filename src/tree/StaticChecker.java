@@ -118,22 +118,35 @@ public class StaticChecker implements DeclVisitor, StatementVisitor,
      */
     public void visitAssignmentNode(StatementNode.AssignmentNode node) {
         beginCheck("Assignment");
-        // Check the left side left value.
-        ExpNode left = node.getVariable().transform(this);
-        node.setVariable(left);
-        // Check the right side expression.
-        ExpNode exp = node.getExp().transform(this);
-        node.setExp(exp);
-        // Validate that it is a true left value and not a constant
-        if (left.getType() instanceof Type.ReferenceType) {
-            /* Validate that the right side expression is assignment
-             * compatible with the left value. This requires that the
-             * right side expression is coerced to the base type of
-             * type of the left side LValue. */
-            Type baseType = ((Type.ReferenceType) left.getType()).getBaseType();
-            node.setExp(baseType.coerceExp(exp));
-        } else if (left.getType() != Type.ERROR_TYPE) {
+        int length = node.size();
+        // Keep track of identifiers to watch for duplicates
+        Set<String> usedIdentifiers = new HashSet<>();
+        for (int i = 0; i < length; i++) {
+            ExpNode[] pair = node.pair(i);
+            // Check the left side left value.
+            ExpNode left = pair[0].transform(this);
+            node.setLeft(i, left);
+            // Check if node variable was used already
+            String id = left.toString();
+            if (usedIdentifiers.contains(id)) {
+                staticError(id + " assigned more than once", left.getLocation());
+            } else {
+                usedIdentifiers.add(id);
+            }
+            // Check the right side expression.
+            ExpNode right = pair[1].transform(this);
+            node.setRight(i, right);
+            // Validate that it is a true left value and not a constant
+            if (left.getType() instanceof Type.ReferenceType) {
+                /* Validate that the right side expression is assignment
+                 * compatible with the left value. This requires that the
+                 * right side expression is coerced to the base type of
+                 * type of the left side LValue. */
+                Type baseType = ((Type.ReferenceType) left.getType()).getBaseType();
+                node.setRight(i, baseType.coerceExp(right));
+            } else if (left.getType() != Type.ERROR_TYPE) {
                 staticError("variable expected", left.getLocation());
+            }
         }
         endCheck("Assignment");
     }

@@ -1,6 +1,7 @@
 package tree;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import java_cup.runtime.ComplexSymbolFactory.Location;
 import syms.Scope;
@@ -125,7 +126,6 @@ public abstract class StatementNode {
         }
     }
 
-
     /**
      * Tree node representing an assignment statement.
      */
@@ -133,16 +133,22 @@ public abstract class StatementNode {
         /**
          * Tree node for expression on left hand side of an assignment.
          */
-        private ExpNode lValue;
+        private List<ExpNode> left = new ArrayList<>();
         /**
          * Tree node for the expression to be assigned.
          */
-        private ExpNode exp;
+        private List<ExpNode> right = new ArrayList<>();
 
-        public AssignmentNode(Location loc, ExpNode variable, ExpNode exp) {
+        public AssignmentNode(Location loc, ExpNode left, ExpNode right) {
             super(loc);
-            this.lValue = variable;
-            this.exp = exp;
+            this.left.add(left);
+            this.right.add(right);
+        }
+
+        public AssignmentNode(Location loc, List<ExpNode> left, List<ExpNode> right) {
+            super(loc);
+            this.left.addAll(left);
+            this.right.addAll(right);
         }
 
         @Override
@@ -150,34 +156,42 @@ public abstract class StatementNode {
             visitor.visitAssignmentNode(this);
         }
 
-        public ExpNode getVariable() {
-            return lValue;
+        public int size() {
+            return this.left.size();
         }
 
-        public void setVariable(ExpNode variable) {
-            this.lValue = variable;
+        public ExpNode left(int i) {
+            return this.left.get(i);
         }
 
-        public ExpNode getExp() {
-            return exp;
+        public ExpNode right(int i) {
+            return this.right.get(i);
         }
 
-        public void setExp(ExpNode exp) {
-            this.exp = exp;
+        public ExpNode[] pair(int i) {
+            return new ExpNode[]{
+                    this.left.get(i),
+                    this.right.get(i)
+            };
         }
 
-        String getVariableName() {
-            if (lValue instanceof ExpNode.VariableNode) {
-                return
-                        ((ExpNode.VariableNode) lValue).getVariable().getIdent();
-            } else {
-                return "<no_name>";
-            }
+        public void setLeft(int i, ExpNode node) {
+            this.left.set(i, node);
+        }
+
+        public void setRight(int i, ExpNode node) {
+            this.right.set(i, node);
         }
 
         @Override
         public String toString(int level) {
-            return lValue.toString() + " := " + exp.toString();
+            String identifiers = this.left.stream()
+                    .map((ExpNode left) -> left.toString())
+                    .collect(Collectors.joining(", "));
+            String values = this.right.stream()
+                    .map((ExpNode exp) -> exp.toString())
+                    .collect(Collectors.joining(", "));
+            return identifiers + " := " + values;
         }
     }
 

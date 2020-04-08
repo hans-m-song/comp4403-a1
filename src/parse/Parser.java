@@ -46,7 +46,9 @@ import java_cup.runtime.ComplexSymbolFactory.Location;
  * Statement -> WhileStatement | IfStatement | CallStatement | Assignment |
  *          ReadStatement | WriteStatement | CompoundStatement | SkipStatement
  * SkipStatement -> KW_SKIP
- * Assignment -> LValue ASSIGN Condition
+ * Assignment -> LValueList ASSIGN ConditionList
+ * LValueList -> LValue { COMMA LValue }
+ * ConditionList -> Condition { COMMA Condition }
  * WhileStatement -> KW_WHILE Condition KW_DO Statement
  * IfStatement -> KW_IF Condition KW_THEN Statement KW_ELSE Statement
  * CallStatement -> KW_CALL IDENTIFIER LPAREN ActualParameters RPAREN
@@ -221,6 +223,9 @@ public class Parser {
     private final ParseMethod<ExpNode> exp = new ParseMethod<>(
             (Location loc) -> new ExpNode.ErrorNode(loc) );
 
+    private final ParseMethod<List<ExpNode>> list = new ParseMethod<>(
+            (Location loc) -> new ArrayList<>() );
+
     /**
      * Set of tokens that may start an LValue.
      */
@@ -270,6 +275,24 @@ public class Parser {
     private final static TokenSet TERM_OPS_SET =
             new TokenSet(Token.TIMES, Token.DIVIDE);
 
+    /**
+     * Rule: ConditionList -> Condition { COMMA Condition }
+     */
+    private List<ExpNode> parseConditionList(TokenSet recoverSet) {
+        return list.parse("Condition List", CONDITION_START_SET, recoverSet,
+                () -> {
+                    TokenSet conditionListRecoverSet = recoverSet.union(Token.COMMA);
+                    List<ExpNode> conditions = new ArrayList<>();
+                    ExpNode cond = parseCondition(conditionListRecoverSet);
+                    conditions.add(cond);
+                    while (tokens.isMatch(Token.COMMA)) {
+                        tokens.match(Token.COMMA);
+                        cond = parseCondition(conditionListRecoverSet);
+                        conditions.add(cond);
+                    }
+                    return conditions;
+                });
+    }
 
     /**
      * Rule: Condition -> RelCondition
@@ -440,6 +463,25 @@ public class Parser {
     }
 
     /**
+     * Rule: LValueList -> LValue { COMMA LValue }
+     */
+    private List<ExpNode> parseLValueList(TokenSet recoverSet) {
+        return list.parse("LValue List", LVALUE_START_SET, recoverSet,
+                () -> {
+                    TokenSet lValueRecoverSet = recoverSet.union(Token.COMMA);
+                    List<ExpNode> lValues = new ArrayList<>();
+                    ExpNode lValue = parseLValue(lValueRecoverSet);
+                    lValues.add(lValue);
+                    while (tokens.isMatch(Token.COMMA)) {
+                        tokens.match(Token.COMMA);
+                        lValue = parseLValue(lValueRecoverSet);
+                        lValues.add(lValue);
+                    }
+                    return lValues;
+                });
+    }
+
+    /**
      * Rule: LValue -> IDENTIFIER
      */
     private ExpNode parseLValue(TokenSet recoverSet) {
@@ -560,20 +602,28 @@ public class Parser {
                             new ExpNode.ErrorNode(loc), new ExpNode.ErrorNode(loc)));
 
     /**
-     * Rule: Assignment -> LValue ASSIGN Condition
+     * Rule: Assignment -> LValueList ASSIGN ConditionList
      */
     private StatementNode.AssignmentNode parseAssignment(TokenSet recoverSet) {
-        return assign.parse("Assignment", LVALUE_START_SET, recoverSet,
+        return assign.parse("MDAssignment", LVALUE_START_SET, recoverSet,
                 () -> {
                     /* The current token is in LVALUE_START_SET.
                      * Non-standard recovery set includes EQUALS because a
                      * common syntax error is to use EQUALS instead of ASSIGN.
                      */
-                    ExpNode left = parseLValue(
+                    List<ExpNode> left = parseLValueList(
                             recoverSet.union(Token.ASSIGN, Token.EQUALS));
                     Location loc = tokens.getLocation();
                     tokens.match(Token.ASSIGN, CONDITION_START_SET);
-                    ExpNode right = parseCondition(recoverSet);
+                    List<ExpNode> right = parseConditionList(recoverSet);
+
+                    if (left.size() != right.size()) {
+                        errors.error("number of variables does not match "
+                                        + "number of expressions in assignment", loc);
+                        return new StatementNode.AssignmentNode(loc,
+                                new ExpNode.ErrorNode(loc), new ExpNode.ErrorNode(loc));
+                    }
+
                     return new StatementNode.AssignmentNode(loc, left, right);
                 });
     }

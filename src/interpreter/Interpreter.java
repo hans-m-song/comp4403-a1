@@ -1,7 +1,5 @@
 package interpreter;
 
-import java.util.*;
-
 import java_cup.runtime.ComplexSymbolFactory.Location;
 import source.VisitorDebugger;
 import source.Errors;
@@ -14,6 +12,8 @@ import java.io.BufferedReader;
 import java.io.PrintStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Execute the abstract syntax tree directly
@@ -121,18 +121,22 @@ public class Interpreter implements StatementVisitor, ExpTransform<Value> {
         frame.assign(lValue.getAddressOffset(), value);
     }
 
-
-
     /**
      * Execute code for an assignment statement
      */
     public void visitAssignmentNode(StatementNode.AssignmentNode node) {
         beginExec("Assignment");
+        int length = node.size();
+        List<Value> queue = new ArrayList<>();
         /* Evaluate the code to be assigned */
-        Value value = node.getExp().evaluate(this);
+        for (int i = 0; i < length; i++) {
+            queue.add(node.right(i).evaluate(this));
+        }
         /* Assign the value to the variables offset */
-        Value lValue = node.getVariable().evaluate(this);
-        assignValue(lValue, value);
+        for (int i = 0; i < length; i++) {
+            Value left = node.left(i).evaluate(this);
+            assignValue(left, queue.get(i));
+        }
         endExec("Assignment");
     }
 
