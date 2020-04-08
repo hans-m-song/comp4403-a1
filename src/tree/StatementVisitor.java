@@ -27,4 +27,8 @@ public interface StatementVisitor {
     void visitWhileNode(StatementNode.WhileNode node);
 
     void visitSkipNode(StatementNode.SkipNode skipNode);
+
+    void visitDoNode(StatementNode.DoNode doNode);
+
+    void visitDoBranchNode(StatementNode.DoBranchNode doBranchNode);
 }

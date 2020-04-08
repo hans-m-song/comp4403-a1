@@ -222,6 +222,21 @@ public class Interpreter implements StatementVisitor, ExpTransform<Value> {
         endExec("Skip");
     }
 
+    @Override
+    public void visitDoNode(StatementNode.DoNode doNode) {
+        beginExec("Do");
+        System.out.println("EXEC doNode");
+        // No branch of do loop has a true guard
+        endExec("Do");
+    }
+
+    @Override
+    public void visitDoBranchNode(StatementNode.DoBranchNode doBranchNode) {
+        beginExec("Do Node");
+        System.out.println("EXEC doBranchNode");
+        endExec("Do Node");
+    }
+
 
     /* Expression Evaluations */
 

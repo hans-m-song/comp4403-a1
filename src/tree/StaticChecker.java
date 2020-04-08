@@ -253,6 +253,25 @@ public class StaticChecker implements DeclVisitor, StatementVisitor,
         endCheck("Skip");
     }
 
+    @Override
+    public void visitDoNode(StatementNode.DoNode doNode) {
+        beginCheck("Do");
+        List<StatementNode.DoBranchNode> branches = doNode.branches();
+        for (int i = 0; i < branches.size(); i++) {
+            // check if condition is boolean or variable ref(boolean) or ...
+            // branches.get(i).condition();
+        }
+        System.out.println("CHECKING doNode");
+        endCheck("Do");
+    }
+
+    @Override
+    public void visitDoBranchNode(StatementNode.DoBranchNode doBranchNode) {
+        beginCheck("Do Node");
+        System.out.println("CHECKING doBranchNode");
+        endCheck("Do Node");
+    }
+
     /*************************************************
      *  Expression node static checker visit methods.
      *  The static checking visitor methods for expressions

@@ -421,5 +421,76 @@ public abstract class StatementNode {
             return "SKIP";
         }
     }
+
+    public static class DoNode extends StatementNode {
+        private List<DoBranchNode> branches;
+        public DoNode(Location loc, List<DoBranchNode> branches) {
+            super(loc);
+            this.branches = branches;
+        }
+
+        public List<DoBranchNode> branches() {
+            return this.branches;
+        }
+
+        public List<ExpNode> conditions() {
+            return this.branches.stream()
+                    .map((DoBranchNode::condition))
+                    .collect(Collectors.toList());
+        }
+
+        @Override
+        public void accept(StatementVisitor visitor) {
+            visitor.visitDoNode(this);
+        }
+
+        @Override
+        public String toString(int level) {
+            return "DO\n\t"
+                    + this.branches.stream()
+                        .map(DoBranchNode::toString)
+                        .collect(Collectors.joining("\n\t"))
+                    + "\nOD";
+        }
+    }
+
+    public static class DoBranchNode extends StatementNode {
+        private ExpNode condition;
+        private StatementNode statements;
+        private boolean exit;
+
+        public DoBranchNode(Location loc, ExpNode condition,
+                            StatementNode statements, boolean exit) {
+            super(loc);
+            this.condition = condition;
+            this.statements = statements;
+            this.exit = exit;
+        }
+
+        public boolean exit() {
+            return this.exit;
+        }
+
+        public ExpNode condition() {
+            return this.condition;
+        }
+
+        public StatementNode statements() {
+            return this.statements;
+        }
+
+        @Override
+        public void accept(StatementVisitor visitor) {
+            visitor.visitDoBranchNode(this);
+        }
+
+        @Override
+        public String toString(int level) {
+            return this.condition.toString()
+                    + " THEN "
+                    + this.statements.toString()
+                    + (this.exit ? " EXIT" : "");
+        }
+    }
 }
 

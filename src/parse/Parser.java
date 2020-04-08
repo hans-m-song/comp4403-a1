@@ -42,9 +42,12 @@ import java_cup.runtime.ComplexSymbolFactory.Location;
  * ProcedureHead -> KW_PROCEDURE IDENTIFIER LPAREN FormalParameters RPAREN
  * FormalParameters ->
  * CompoundStatement -> KW_BEGIN StatementList KW_END
+ * DoStatement -> KW_DO DoBranch { SEPARATOR DoBranch } KW_OD
+ * DoBranch -> Condition KW_THEN StatementList [ KW_EXIT ]
  * StatementList -> Statement { SEMICOLON Statement }
  * Statement -> WhileStatement | IfStatement | CallStatement | Assignment |
- *          ReadStatement | WriteStatement | CompoundStatement | SkipStatement
+ *          ReadStatement | WriteStatement | CompoundStatement | SkipStatement |
+ *          DoStatement
  * SkipStatement -> KW_SKIP
  * Assignment -> LValueList ASSIGN ConditionList
  * LValueList -> LValue { COMMA LValue }
@@ -223,7 +226,7 @@ public class Parser {
     private final ParseMethod<ExpNode> exp = new ParseMethod<>(
             (Location loc) -> new ExpNode.ErrorNode(loc) );
 
-    private final ParseMethod<List<ExpNode>> list = new ParseMethod<>(
+    private final ParseMethod<List<ExpNode>> expList = new ParseMethod<>(
             (Location loc) -> new ArrayList<>() );
 
     /**
@@ -279,7 +282,7 @@ public class Parser {
      * Rule: ConditionList -> Condition { COMMA Condition }
      */
     private List<ExpNode> parseConditionList(TokenSet recoverSet) {
-        return list.parse("Condition List", CONDITION_START_SET, recoverSet,
+        return expList.parse("Condition List", CONDITION_START_SET, recoverSet,
                 () -> {
                     TokenSet conditionListRecoverSet = recoverSet.union(Token.COMMA);
                     List<ExpNode> conditions = new ArrayList<>();
@@ -466,7 +469,7 @@ public class Parser {
      * Rule: LValueList -> LValue { COMMA LValue }
      */
     private List<ExpNode> parseLValueList(TokenSet recoverSet) {
-        return list.parse("LValue List", LVALUE_START_SET, recoverSet,
+        return expList.parse("LValue List", LVALUE_START_SET, recoverSet,
                 () -> {
                     TokenSet lValueRecoverSet = recoverSet.union(Token.COMMA);
                     List<ExpNode> lValues = new ArrayList<>();
@@ -511,7 +514,7 @@ public class Parser {
             LVALUE_START_SET.union(Token.KW_WHILE, Token.KW_IF,
                     Token.KW_READ, Token.KW_WRITE,
                     Token.KW_CALL, Token.KW_BEGIN,
-                    Token.KW_SKIP);
+                    Token.KW_SKIP, Token.KW_DO);
 
     /**
      * Rule: CompoundStatement -> BEGIN StatementList END
@@ -552,7 +555,7 @@ public class Parser {
     /**
      * Rule: Statement -> Assignment | WhileStatement | IfStatement
      * | ReadStatement | WriteStatement | CallStatement
-     * | CompoundStatement | SkipStatement
+     * | CompoundStatement | SkipStatement | DoStatement
      */
     private StatementNode parseStatement(TokenSet recoverSet) {
         return stmt.parse("Statement", STATEMENT_START_SET, recoverSet,
@@ -563,6 +566,8 @@ public class Parser {
                      * of using a switch statement can be used because the
                      * start set of every alternative contains just one token. */
                     switch (tokens.getKind()) {
+                        case KW_DO:
+                            return parseDoStatement(recoverSet);
                         case KW_SKIP:
                             return parseSkipStatement(recoverSet);
                         case IDENTIFIER:
@@ -712,6 +717,53 @@ public class Parser {
                     tokens.match(Token.RPAREN, recoverSet);
                     return new StatementNode.CallNode(loc, procId
                     );
+                });
+    }
+
+    private final ParseMethod<StatementNode.DoBranchNode> doStmt = new ParseMethod<>(
+            (Location loc) -> new StatementNode.DoBranchNode(loc,
+                    new ExpNode.ErrorNode(loc), new StatementNode.ErrorNode(loc), false));
+
+    private final ParseMethod<List<StatementNode.DoBranchNode>> doList = new ParseMethod<>(
+            (Location loc) -> new ArrayList<>());
+
+    private StatementNode.DoBranchNode parseDoBranch(TokenSet recoverSet) {
+        return doStmt.parse("Do Branch", CONDITION_START_SET, recoverSet,
+                () -> {
+                    Location loc = tokens.getLocation();
+                    // Parse condition
+                    ExpNode cond = parseCondition(recoverSet.union(Token.KW_THEN));
+                    tokens.match(Token.KW_THEN, STATEMENT_START_SET);
+                    // Parse statement list
+                    StatementNode statements = parseStatementList(
+                            recoverSet.union(Token.KW_EXIT, Token.SEPARATOR));
+                    // Check for exit keyword
+                    boolean exit = false;
+                    if (tokens.isMatch(Token.KW_EXIT)) {
+                        tokens.match(Token.KW_EXIT);
+                        exit = true;
+                    }
+                    return new StatementNode.DoBranchNode(loc, cond, statements, exit);
+                });
+    }
+
+    private StatementNode parseDoStatement(TokenSet recoverSet) {
+        return stmt.parse("Do Statement", Token.KW_DO, recoverSet,
+                () -> {
+                    Location loc = tokens.getLocation();
+                    tokens.match(Token.KW_DO);
+                    List<StatementNode.DoBranchNode> branches = new ArrayList<>();
+                    TokenSet doBranchRecoverSet = recoverSet.union(
+                            Token.SEPARATOR, Token.KW_OD);
+                    StatementNode.DoBranchNode branch = parseDoBranch(doBranchRecoverSet);
+                    branches.add(branch);
+                    while (tokens.isMatch(Token.SEPARATOR)) {
+                        tokens.match(Token.SEPARATOR);
+                        branch = parseDoBranch(doBranchRecoverSet);
+                        branches.add(branch);
+                    }
+                    tokens.match(Token.KW_OD, recoverSet);
+                    return new StatementNode.DoNode(loc, branches);
                 });
     }
 
